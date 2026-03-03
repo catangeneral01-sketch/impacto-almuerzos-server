@@ -26,6 +26,24 @@ app.post("/webhook", (req, res) => {
 });
 
 app.get("/", (req, res) => res.status(200).send("Impacto Almuerzos Server OK"));
+app.get("/test-token", async (req, res) => {
+  try {
+    const shop = process.env.SHOPIFY_SHOP;
+    const token = process.env.SHOPIFY_ACCESS_TOKEN;
 
+    const r = await fetch(`https://${shop}/admin/api/2026-01/shop.json`, {
+      headers: {
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const txt = await r.text();
+    return res.status(r.status).send(txt);
+  } catch (e) {
+    return res.status(500).send(String(e));
+  }
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Server running on", PORT));
+
