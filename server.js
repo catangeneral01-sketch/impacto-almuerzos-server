@@ -61,34 +61,55 @@ async function upsertShopMetafield(shop, token, newValue, existingMetafieldId) {
   if (!r.ok) throw new Error(`POST metafield failed (${r.status}): ${txt}`);
 }
 
-app.get("/webhook", (req, res) => res.status(200).send("OK - webhook endpoint ready (GET)"));
-
-app.post("/webhook", async (req, res) => {
+// Helper compartido para +1 y -1
+async function handleOrderWebhook(req, res, delta, label) {
   try {
     if (!verifyShopifyWebhook(req)) {
       console.log("❌ Webhook inválido (HMAC no coincide)");
       return res.status(401).send("Invalid webhook");
     }
-    console.log("✅ WEBHOOK VALIDADO (HMAC OK)");
+    console.log(`✅ WEBHOOK VALIDADO (HMAC OK) - ${label}`);
+
     const shop = process.env.SHOPIFY_SHOP;
     const token = process.env.SHOPIFY_ACCESS_TOKEN;
     if (!shop || !token) {
       console.log("❌ Faltan SHOPIFY_SHOP o SHOPIFY_ACCESS_TOKEN");
       return res.status(500).send("Missing env vars");
     }
+
     const mf = await getShopMetafield(shop, token);
     const current = mf ? parseInt(mf.value || "0", 10) : 0;
-    const next = current + 1;
+    const next = Math.max(0, current + delta); // nunca baja de 0
     await upsertShopMetafield(shop, token, next, mf?.id);
-    console.log(`🍽️ Contador actualizado: ${current} -> ${next}`);
+
+    console.log(`🍽️ [${label}] Contador: ${current} -> ${next}`);
     return res.status(200).send("OK");
   } catch (e) {
-    console.log("❌ Error procesando webhook:", String(e));
+    console.log(`❌ Error procesando webhook [${label}]:`, String(e));
     return res.status(200).send("OK");
   }
-});
+}
 
+// GET para probar en navegador
+app.get("/webhook", (req, res) => res.status(200).send("OK - webhook endpoint ready (GET)"));
+
+// Pedido CREADO → +1
+app.post("/webhook", (req, res) => handleOrderWebhook(req, res, +1, "orders/create"));
+
+// Pedido ELIMINADO → -1
+app.post("/webhook/delete", (req, res) => handleOrderWebhook(req, res, -1, "orders/delete"));
+
+// Health check
 app.get("/", (req, res) => res.status(200).send("Impacto Almuerzos Server OK"));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Server running on", PORT));
+```
+
+---
+
+**Los 2 cambios que hiciste falta hacer también en Shopify:**
+
+1. **Registrar el nuevo webhook** `orders/delete` apuntando a:
+```
+   https://TU-SERVIDOR.onrender.com/webhook/delete
