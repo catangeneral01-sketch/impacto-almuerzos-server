@@ -105,11 +105,3 @@ app.get("/", (req, res) => res.status(200).send("Impacto Almuerzos Server OK"));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Server running on", PORT));
 ```
-
----
-
-**Los 2 cambios que hiciste falta hacer también en Shopify:**
-
-1. **Registrar el nuevo webhook** `orders/delete` apuntando a:
-```
-   https://TU-SERVIDOR.onrender.com/webhook/delete
